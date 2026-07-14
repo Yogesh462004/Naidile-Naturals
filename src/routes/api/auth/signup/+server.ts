@@ -83,12 +83,26 @@ export const POST: RequestHandler = async ({ request, url }) => {
 					const resendData = await resendRes.json();
 					console.error('Resend signup email error:', resendData);
 					if (resendData?.message && resendData.message.includes('only send testing emails to your own email address') && createdUser) {
-						// If Resend sandbox blocks sending to a customer email, auto-confirm their account so they aren't stuck!
-						await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
+						// Fallback to Supabase built-in / SMTP email service to deliver real-time verification email to customer!
+						const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
+							redirectTo: `${origin}/auth/confirm`
+						});
+						if (inviteErr) {
+							console.error('Supabase fallback invite error:', inviteErr);
+							// Only auto-confirm if both Resend and Supabase rate limits are exhausted
+							if (inviteErr.status === 429 || inviteErr.code === 'over_email_send_rate_limit') {
+								await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
+								return json({
+									success: true,
+									autoConfirmed: true,
+									message: `Account created! Since free test email limits were reached, we automatically verified your account so you can log in immediately.`
+								});
+							}
+						}
 						return json({
 							success: true,
-							autoConfirmed: true,
-							message: `Account created! Since Resend is currently using its free test sandbox (which only sends to your admin email), we automatically verified your account so you can log in right now.`
+							autoConfirmed: false,
+							message: `We've sent a confirmation link to ${cleanEmail}. Verify your email address to activate your customer account.`
 						});
 					}
 				}
@@ -96,13 +110,18 @@ export const POST: RequestHandler = async ({ request, url }) => {
 				console.error('Resend email error:', err);
 			}
 		} else if (createdUser) {
-			// If no Resend key is present, auto confirm so they don't get stuck by GoTrue limit
-			await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
-			return json({
-				success: true,
-				autoConfirmed: true,
-				message: `Account created and verified! You can now log into your customer account.`
+			// Try Supabase invite email if Resend is unconfigured
+			const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
+				redirectTo: `${origin}/auth/confirm`
 			});
+			if (inviteErr && (inviteErr.status === 429 || inviteErr.code === 'over_email_send_rate_limit')) {
+				await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
+				return json({
+					success: true,
+					autoConfirmed: true,
+					message: `Account created and verified! You can now log into your customer account.`
+				});
+			}
 		}
 
 		return json({
