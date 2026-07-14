@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@theme {
+	--font-sans: 'Jost', sans-serif;
+	--font-serif: 'Cormorant Garamond', serif;
+
+	--color-cream: #eaf3f5;
+	--color-cream-deep: #daeaee;
+	--color-ink: #23414b;
+	--color-olive: #4b5a3a;
+	--color-olive-deep: #37432a;
+	--color-terracotta: #c1704f;
+	--color-gold: #b9945b;
+	--color-line: rgba(20, 55, 66, 0.14);
+
+	--color-muted: #57737c;
+	--color-placeholder: #62808a;
+	--color-body: #3d5a63;
+	--color-inactive: #6f8e97;
+
+	--shadow-card: 0 10px 30px rgba(20, 55, 66, 0.14);
+}
+
+@layer base {
+	html {
+		font-family: var(--font-sans);
+		color: var(--color-ink);
+		background: var(--color-cream);
+	}
+	h1,
+	h2,
+	h3,
+	.serif {
+		font-family: var(--font-serif);
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		color: var(--color-olive-deep);
+	}
+	button,
+	a[href],
+	[role="button"] {
+		cursor: pointer;
+	}
+	button:disabled,
+	button[disabled] {
+		cursor: not-allowed;
+	}
+}
+
+@layer utilities {
+	.eyebrow {
+		font-size: 0.7rem;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		font-weight: 500;
+		color: var(--color-terracotta);
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.animate-fade-in {
+	animation: fadeIn 0.35s ease;
+}
+
+/* !important so it wins over `focus:outline-none` utilities: keyboard focus stays visible
+   using the existing gold accent instead of the browser's default outline. */
+:focus-visible {
+	outline: 2px solid var(--color-gold) !important;
+	outline-offset: 2px !important;
+}
