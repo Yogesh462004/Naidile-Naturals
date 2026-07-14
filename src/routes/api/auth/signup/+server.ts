@@ -89,8 +89,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
 						});
 						if (inviteErr) {
 							console.error('Supabase fallback invite error:', inviteErr);
-							// Only auto-confirm if both Resend and Supabase rate limits are exhausted
-							if (inviteErr.status === 429 || inviteErr.code === 'over_email_send_rate_limit') {
+							// If rate limit across free tier is reached, auto-confirm account
+							if (inviteErr.status === 429 || inviteErr.code === 'over_email_send_rate_limit' || (inviteErr.message && inviteErr.message.includes('rate limit'))) {
 								await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
 								return json({
 									success: true,
@@ -98,6 +98,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 									message: `Account created! Since free test email limits were reached, we automatically verified your account so you can log in immediately.`
 								});
 							}
+							return json({ error: `Email delivery failed: ${inviteErr.message}. Please check your Supabase Email/SMTP settings.` }, { status: 400 });
 						}
 						return json({
 							success: true,
