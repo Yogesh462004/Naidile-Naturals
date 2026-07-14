@@ -83,12 +83,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
 					const resendData = await resendRes.json();
 					console.error('Resend signup email error:', resendData);
 					if (resendData?.message && resendData.message.includes('only send testing emails to your own email address') && createdUser) {
-						// Fallback to Supabase built-in / SMTP email service to deliver real-time verification email to customer!
-						const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
-							redirectTo: `${origin}/auth/confirm`
+						// Fallback: trigger Supabase (and your Gmail Custom SMTP) to send the real confirmation email to the newly created user!
+						const { error: smtpErr } = await adminClient.auth.resend({
+							type: 'signup',
+							email: cleanEmail,
+							options: { emailRedirectTo: `${origin}/auth/confirm` }
 						});
-						if (inviteErr) {
-							console.error('Supabase fallback invite error:', inviteErr);
+						if (smtpErr) {
+							console.error('Supabase SMTP resend error:', smtpErr);
 							await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
 							return json({
 								success: true,
@@ -107,11 +109,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
 				console.error('Resend email error:', err);
 			}
 		} else if (createdUser) {
-			// Try Supabase invite email if Resend is unconfigured
-			const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(cleanEmail, {
-				redirectTo: `${origin}/auth/confirm`
+			// Trigger Supabase (and your Gmail Custom SMTP) if Resend is unconfigured
+			const { error: smtpErr } = await adminClient.auth.resend({
+				type: 'signup',
+				email: cleanEmail,
+				options: { emailRedirectTo: `${origin}/auth/confirm` }
 			});
-			if (inviteErr) {
+			if (smtpErr) {
 				await adminClient.auth.admin.updateUserById(createdUser.id, { email_confirm: true });
 				return json({
 					success: true,
