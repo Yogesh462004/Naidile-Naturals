@@ -113,9 +113,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
 						const resendData = await resendRes.json();
 						console.error('Resend API error:', resendData);
 						if (resendData?.message && resendData.message.includes('only send testing emails to your own email address')) {
-							return json({
-								error: `Resend Sandbox Limit: Because you are currently using Resend's free test domain (onboarding@resend.dev), Resend ONLY allows sending emails to your own registered account email address (yp901981@gmail.com).\n\nTo send emails to any customer email (like "${cleanEmail}"), add and verify your business domain (e.g. naidile.com) inside your Resend dashboard -> Domains.`
-							}, { status: 403 });
+							if (resetEmailErr) {
+								return json({
+									error: `Resend Sandbox Limit: Because you are currently using Resend's free test domain (onboarding@resend.dev), Resend ONLY allows sending emails to your own registered account email address (yp901981@gmail.com).\n\nTo send emails to any customer email (like "${cleanEmail}"), add and verify your business domain inside your Resend dashboard.`
+								}, { status: 403 });
+							} else {
+								console.warn(`Resend sandbox prevented sending to ${cleanEmail}, but Supabase built-in email service successfully delivered the recovery link.`);
+							}
 						}
 					}
 				} catch (emailErr) {
