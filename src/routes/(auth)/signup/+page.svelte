@@ -13,6 +13,8 @@
 	let submitting = $state(false);
 	let errorMsg = $state('');
 	let sent = $state(false);
+	let autoConfirmed = $state(false);
+	let autoConfirmMsg = $state('');
 
 	const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-=+~`';/\\\[\]]).{8,}$/;
 
@@ -60,29 +62,36 @@
 			console.error('Duplicate check error:', err);
 		}
 
-		// Step 2: Proceed with new customer registration
-		const { error } = await data.supabase.auth.signUp({
-			email: email.trim(),
-			password,
-			options: {
-				data: {
-					full_name: fullName.trim(),
-					name: fullName.trim(),
-					mobile_number: formattedPhone,
-					phone: formattedPhone,
-					role: 'customer'
-				},
-				emailRedirectTo: `${window.location.origin}/auth/confirm`
-			}
-		});
+		// Step 2: Proceed with new customer registration via our Resend + admin API
+		try {
+			const res = await fetch('/api/auth/signup', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					email: email.trim(),
+					password,
+					fullName: fullName.trim(),
+					phone: formattedPhone
+				})
+			});
+			const result = await res.json();
 
-		if (error) {
-			errorMsg = error.message;
+			if (!res.ok || result.error) {
+				errorMsg = result.error || 'Failed to create customer account.';
+				submitting = false;
+				return;
+			}
+
+			if (result.autoConfirmed) {
+				autoConfirmed = true;
+				autoConfirmMsg = result.message;
+			}
+			sent = true;
+		} catch (err: any) {
+			errorMsg = err.message || 'An unexpected network error occurred.';
 			submitting = false;
 			return;
 		}
-
-		sent = true;
 	}
 </script>
 
@@ -93,14 +102,25 @@
 <div class="mx-auto max-w-md">
 	{#if sent}
 		<div class="rounded-2xl border border-line bg-white p-8 text-center shadow-card" role="status" aria-live="polite">
-			<span class="text-4xl">✉️</span>
-			<h1 class="mt-3 serif text-2xl font-medium text-ink">Check Your Email</h1>
-			<p class="mt-3 text-sm text-body">
-				We've sent a confirmation link to <strong>{email}</strong>. Verify your email address to activate your customer account.
-			</p>
-			<div class="mt-6">
-				<a href="/login" class="text-sm font-medium text-terracotta hover:underline">← Back to Login</a>
-			</div>
+			{#if autoConfirmed}
+				<span class="text-4xl">🎉</span>
+				<h1 class="mt-3 serif text-2xl font-medium text-ink">Account Verified!</h1>
+				<p class="mt-3 text-sm text-body">
+					{autoConfirmMsg || 'Your customer account has been created and verified! You can now log into your account directly.'}
+				</p>
+				<div class="mt-6">
+					<a href="/login" class="inline-block rounded-xl bg-terracotta px-6 py-3 font-medium text-white shadow-soft transition hover:bg-terracotta-dark">Go to Customer Login →</a>
+				</div>
+			{:else}
+				<span class="text-4xl">✉️</span>
+				<h1 class="mt-3 serif text-2xl font-medium text-ink">Check Your Email</h1>
+				<p class="mt-3 text-sm text-body">
+					We've sent a confirmation link to <strong>{email}</strong>. Verify your email address to activate your customer account.
+				</p>
+				<div class="mt-6">
+					<a href="/login" class="text-sm font-medium text-terracotta hover:underline">← Back to Login</a>
+				</div>
+			{/if}
 		</div>
 	{:else}
 		<h1 class="text-center serif text-2xl font-medium text-ink">Create Customer Account</h1>
